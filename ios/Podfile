@@ -1,0 +1,88 @@
+platform :ios, '13.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      # Lift all pods to iOS 13 minimum
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+
+      # Allow non-modular includes in framework modules (Firebase Firebase.h)
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+
+      # Fix gRPC-Core / abseil / BoringSSL template error with Apple Clang 16+
+      grpc_pods = %w[gRPC-Core gRPC-C++ abseil BoringSSL-GRPC]
+      if grpc_pods.include?(target.name)
+        config.build_settings['OTHER_CPLUSPLUSFLAGS'] =
+          '$(inherited) -Wno-missing-template-arg-list-after-template-kw'
+        config.build_settings['OTHER_CFLAGS'] =
+          '$(inherited) -Wno-missing-template-arg-list-after-template-kw'
+        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+      end
+    end
+  end
+
+  # Apply CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES to Runner project too
+  runner_project_path = File.expand_path('../Runner.xcodeproj', __FILE__)
+  runner_project = Xcodeproj::Project.open(runner_project_path)
+  runner_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+    end
+  end
+  runner_project.save
+
+  # Remove -GCC_WARN_INHIBIT_ALL_WARNINGS from per-file COMPILER_FLAGS in ALL pods
+  # (BoringSSL-GRPC embeds this in per-file flags; clang parses it as -G <arg> which is
+  #  unsupported on iOS simulator targets. Use the build-setting equivalent instead.)
+  installer.pods_project.targets.each do |target|
+    next unless target.respond_to?(:source_build_phase) && target.source_build_phase
+    target.source_build_phase.files.each do |file|
+      next unless file.settings && file.settings['COMPILER_FLAGS']
+      flags = file.settings['COMPILER_FLAGS']
+      # Remove -GCC_WARN_INHIBIT_ALL_WARNINGS (clang parses -G as a separate option)
+      flags = flags.gsub('-GCC_WARN_INHIBIT_ALL_WARNINGS', '')
+      # Collapse multiple spaces left behind
+      flags = flags.gsub(/\s+/, ' ').strip
+      file.settings['COMPILER_FLAGS'] = flags
+    end
+  end
+
+  installer.pods_project.save
+end

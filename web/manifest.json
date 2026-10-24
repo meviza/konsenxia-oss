@@ -1,0 +1,36 @@
+{
+  "name": "KONSENXIA",
+  "short_name": "KX",
+  "start_url": "/app.html",
+  "display": "standalone",
+  "theme_color": "#2DD4BF",
+  "background_color": "#0A0E17",
+  "orientation": "any",
+  "prefer_related_applications": false,
+  "description": "Doctor-to-doctor knowledge sharing and AI-powered diagnostic platform",
+  "categories": ["medical", "health", "education"],
+  "icons": [
+    {
+      "src": "icons/Icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/Icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/Icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/Icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
